@@ -25,7 +25,7 @@ import Link from "next/link";
 function StartInterview({ params }) {
   // Unwrap params for Next.js 15 compatibility
   const { interviewId } = use(params);
-  
+
   const [interviewData, setInterviewData] = useState();
   const [mockInterviewQuestion, setMockInterviewQuestion] = useState();
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
@@ -64,10 +64,15 @@ function StartInterview({ params }) {
       setRecordedBlob(null);
       setAudioUrl(null);
       setIsRecording(false);
+      setIsPlaying(false);
 
       // Move to next question
       if (activeQuestionIndex < mockInterviewQuestion?.length - 1) {
         setActiveQuestionIndex(activeQuestionIndex + 1);
+        // Small delay to ensure state is properly reset
+        setTimeout(() => {
+          console.log("Moved to next question, recording states reset");
+        }, 100);
       }
     } catch (error) {
       console.error("Error handling answer submission:", error);

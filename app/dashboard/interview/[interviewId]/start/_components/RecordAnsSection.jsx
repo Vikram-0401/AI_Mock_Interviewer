@@ -10,6 +10,7 @@ import {
   Camera,
   AlertCircle,
   CheckCircle,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import Webcam from "react-webcam";
@@ -31,87 +32,157 @@ const RecordAnsSection = ({
 }) => {
   const mediaRecorderRef = useRef(null);
   const audioRef = useRef(null);
+  const streamRef = useRef(null);
   const [transcript, setTranscript] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
 
   // Initialize MediaRecorder when component mounts
   useEffect(() => {
-    const initializeMediaRecorder = async () => {
-      try {
-        console.log("Requesting microphone permission...");
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            sampleRate: 44100,
-          },
-        });
-
-        console.log("Microphone permission granted, creating MediaRecorder...");
-        mediaRecorderRef.current = new MediaRecorder(stream, {
-          mimeType: "audio/webm;codecs=opus",
-        });
-
-        mediaRecorderRef.current.ondataavailable = (event) => {
-          console.log("Data available:", event.data.size, "bytes");
-          if (event.data.size > 0) {
-            setRecordedBlob(event.data);
-            const url = URL.createObjectURL(event.data);
-            setAudioUrl(url);
-          }
-        };
-
-        mediaRecorderRef.current.onstart = () => {
-          console.log("Recording started");
-        };
-
-        mediaRecorderRef.current.onstop = () => {
-          console.log("Recording stopped");
-          // Stop all tracks when recording stops
-          stream.getTracks().forEach((track) => track.stop());
-        };
-
-        mediaRecorderRef.current.onerror = (event) => {
-          console.error("MediaRecorder error:", event.error);
-          toast.error("Recording error occurred");
-        };
-
-        setHasPermission(true);
-        console.log("MediaRecorder initialized successfully");
-      } catch (error) {
-        console.error("Error accessing microphone:", error);
-        if (error.name === "NotAllowedError") {
-          toast.error(
-            "Microphone permission denied. Please allow microphone access and refresh the page."
-          );
-        } else if (error.name === "NotFoundError") {
-          toast.error(
-            "No microphone found. Please connect a microphone and refresh the page."
-          );
-        } else {
-          toast.error(
-            "Unable to access microphone. Please check permissions and refresh the page."
-          );
-        }
-        setHasPermission(false);
-      }
-    };
-
     initializeMediaRecorder();
 
     // Cleanup function
     return () => {
-      if (
-        mediaRecorderRef.current &&
-        mediaRecorderRef.current.state === "recording"
-      ) {
-        mediaRecorderRef.current.stop();
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [setRecordedBlob, setAudioUrl]);
+  }, []);
 
-  const startRecording = () => {
+  // Re-initialize MediaRecorder when question changes
+  useEffect(() => {
+    if (currentQuestion && hasPermission) {
+      // Reset states for new question
+      setIsRecording(false);
+      setRecordedBlob(null);
+      setAudioUrl(null);
+      setIsPlaying(false);
+
+      // Re-initialize MediaRecorder for new question
+      setTimeout(() => {
+        reinitializeMediaRecorder();
+      }, 100);
+    }
+  }, [currentQuestion, hasPermission]);
+
+  const initializeMediaRecorder = async () => {
+    try {
+      console.log("Requesting microphone permission...");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100,
+        },
+      });
+
+      streamRef.current = stream;
+      console.log("Microphone permission granted, creating MediaRecorder...");
+
+      mediaRecorderRef.current = new MediaRecorder(stream, {
+        mimeType: "audio/webm;codecs=opus",
+      });
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        console.log("Data available:", event.data.size, "bytes");
+        if (event.data.size > 0) {
+          setRecordedBlob(event.data);
+          const url = URL.createObjectURL(event.data);
+          setAudioUrl(url);
+        }
+      };
+
+      mediaRecorderRef.current.onstart = () => {
+        console.log("Recording started");
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        console.log("Recording stopped");
+        // Don't stop tracks here - we'll reuse the stream
+      };
+
+      mediaRecorderRef.current.onerror = (event) => {
+        console.error("MediaRecorder error:", event.error);
+        toast.error("Recording error occurred");
+      };
+
+      setHasPermission(true);
+      console.log("MediaRecorder initialized successfully");
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      if (error.name === "NotAllowedError") {
+        toast.error(
+          "Microphone permission denied. Please allow microphone access and refresh the page."
+        );
+      } else if (error.name === "NotFoundError") {
+        toast.error(
+          "No microphone found. Please connect a microphone and refresh the page."
+        );
+      } else {
+        toast.error(
+          "Unable to access microphone. Please check permissions and refresh the page."
+        );
+      }
+      setHasPermission(false);
+    }
+  };
+
+  // Re-initialize MediaRecorder for new recording sessions
+  const reinitializeMediaRecorder = async () => {
+    try {
+      // Stop existing stream if any
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+
+      // Request new stream
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100,
+        },
+      });
+
+      streamRef.current = stream;
+
+      // Create new MediaRecorder
+      mediaRecorderRef.current = new MediaRecorder(stream, {
+        mimeType: "audio/webm;codecs=opus",
+      });
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        console.log("Data available:", event.data.size, "bytes");
+        if (event.data.size > 0) {
+          setRecordedBlob(event.data);
+          const url = URL.createObjectURL(event.data);
+          setAudioUrl(url);
+        }
+      };
+
+      mediaRecorderRef.current.onstart = () => {
+        console.log("Recording started");
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        console.log("Recording stopped");
+      };
+
+      mediaRecorderRef.current.onerror = (event) => {
+        console.error("MediaRecorder error:", event.error);
+        toast.error("Recording error occurred");
+      };
+
+      console.log("MediaRecorder re-initialized successfully");
+      return true;
+    } catch (error) {
+      console.error("Error re-initializing MediaRecorder:", error);
+      toast.error("Failed to initialize recording. Please try again.");
+      return false;
+    }
+  };
+
+  const startRecording = async () => {
     console.log(
       "Start recording clicked, current state:",
       mediaRecorderRef.current?.state
@@ -122,6 +193,15 @@ const RecordAnsSection = ({
         "Microphone permission not granted. Please refresh the page and allow microphone access."
       );
       return;
+    }
+
+    // Check if MediaRecorder is ready, if not, re-initialize
+    if (
+      !mediaRecorderRef.current ||
+      mediaRecorderRef.current.state === "inactive"
+    ) {
+      const success = await reinitializeMediaRecorder();
+      if (!success) return;
     }
 
     if (
@@ -329,6 +409,30 @@ const RecordAnsSection = ({
             )}
           </div>
 
+          {/* Manual Reset Button */}
+          <div className="flex justify-center">
+            <Button
+              onClick={async () => {
+                try {
+                  await reinitializeMediaRecorder();
+                  setRecordedBlob(null);
+                  setAudioUrl(null);
+                  setIsRecording(false);
+                  setIsPlaying(false);
+                  toast.success("Recording system reset successfully!");
+                } catch (error) {
+                  toast.error("Failed to reset recording system");
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Reset Recording System
+            </Button>
+          </div>
+
           {/* Recording Status */}
           {isRecording && (
             <motion.div
@@ -422,6 +526,12 @@ const RecordAnsSection = ({
                 {mediaRecorderRef.current?.state || "Not initialized"}
               </p>
               <p>Debug: Is Recording: {isRecording ? "Yes" : "No"}</p>
+              <p>
+                Debug: Stream Active: {streamRef.current?.active ? "Yes" : "No"}
+              </p>
+              <p>
+                Debug: Current Question: {currentQuestion ? "Set" : "Not set"}
+              </p>
             </div>
           )}
         </CardContent>
