@@ -1,16 +1,7 @@
-import React from 'react'
-import Header from './_components/Header'
+import React from "react";
 
-function DashbaordLayout({children}) {
-  return (
-    <div>
-      <Header/>
-      <div className='mx-5 md:mx-20 lg:mx-30'>
-      {children}
-      </div>
-     
-    </div>
-  )
+function DashboardLayout({ children }) {
+  return <div className="min-h-screen">{children}</div>;
 }
 
-export default DashbaordLayout
+export default DashboardLayout;

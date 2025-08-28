@@ -5,15 +5,18 @@ import { MockInterview } from "@/utils/schema";
 import { eq } from "drizzle-orm";
 import { Lightbulb, WebcamIcon } from "lucide-react";
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, use } from "react";
 import Webcam from "react-webcam";
 
 function Interview({ params }) {
+  // Unwrap params for Next.js 15 compatibility
+  const { interviewId } = use(params);
+
   const [interviewData, setInterviewData] = useState(null); // Default to null
   const [webCamEnabled, setWebCamEnabled] = useState(false);
 
   useEffect(() => {
-    console.log(params.interviewId);
+    console.log(interviewId);
     GetInterviewDetails();
   }, []);
 
@@ -21,7 +24,7 @@ function Interview({ params }) {
     const result = await db
       .select()
       .from(MockInterview)
-      .where(eq(MockInterview.mockId, params.interviewId));
+      .where(eq(MockInterview.mockId, interviewId));
 
     setInterviewData(result[0]);
   };
@@ -57,9 +60,11 @@ function Interview({ params }) {
               <strong>Information</strong>
             </h2>
             <h2 className="mt-3 text-yellow-600">
-            Enable Video Web Cam and Microphone to Start your AI Generated Mock Interview,
-            It Has 5 question which you can answer and at the last you will get the report on the basis of your answer.
-            NOTE: We never record your video, Web cam access you can disable at any time If you want
+              Enable Video Web Cam and Microphone to Start your AI Generated
+              Mock Interview, It Has 5 question which you can answer and at the
+              last you will get the report on the basis of your answer. NOTE: We
+              never record your video, Web cam access you can disable at any
+              time If you want
             </h2>
           </div>
         </div>
@@ -89,8 +94,8 @@ function Interview({ params }) {
         </div>
       </div>
       <div className="flex justify-end items-end">
-        <Link href={'/dashboard/interview/'+params.interviewId+'/start'}>
-        <Button>Start Interview</Button>
+        <Link href={"/dashboard/interview/" + interviewId + "/start"}>
+          <Button>Start Interview</Button>
         </Link>
       </div>
     </div>
