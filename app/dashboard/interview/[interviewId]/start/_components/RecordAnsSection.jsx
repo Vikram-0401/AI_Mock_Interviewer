@@ -11,6 +11,7 @@ import {
   AlertCircle,
   CheckCircle,
   RefreshCw,
+  SkipForward,
 } from "lucide-react";
 import { toast } from "sonner";
 import Webcam from "react-webcam";
@@ -21,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 const RecordAnsSection = ({
   currentQuestion,
   onAnswerSubmit,
+  onSkipQuestion,
   isRecording,
   setIsRecording,
   recordedBlob,
@@ -30,6 +32,7 @@ const RecordAnsSection = ({
   audioUrl,
   setAudioUrl,
   isQuestionAnswered,
+  isQuestionSkipped,
 }) => {
   const mediaRecorderRef = useRef(null);
   const audioRef = useRef(null);
@@ -505,32 +508,99 @@ const RecordAnsSection = ({
                 </p>
               </div>
             </motion.div>
-          ) : recordedBlob ? (
+          ) : isQuestionSkipped ? (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="pt-4"
+              className="pt-4 space-y-3"
             >
+              <div className="w-full p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg text-center">
+                <SkipForward className="w-8 h-8 text-orange-600 dark:text-orange-400 mx-auto mb-2" />
+                <p className="text-orange-800 dark:text-orange-200 font-medium">Question Skipped</p>
+                <p className="text-orange-600 dark:text-orange-400 text-sm mt-1">
+                  You can now record and submit an answer, or continue skipping
+                </p>
+              </div>
+              
+              {/* Skip Button Only */}
               <Button
-                onClick={handleSubmit}
+                onClick={onSkipQuestion}
+                variant="outline"
                 size="lg"
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                className="w-full border-orange-300 dark:border-orange-600 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+              >
+                <SkipForward className="w-5 h-5 mr-2" />
+                Skip Again
+              </Button>
+              
+              {/* Show submit button if recording is complete */}
+              {recordedBlob && !isRecording && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="pt-4"
+                >
+                  <Button
+                    onClick={handleSubmit}
+                    size="lg"
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-5 h-5 mr-2" />
+                        Submit Answer
+                      </>
+                    )}
+                  </Button>
+                </motion.div>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="pt-4 space-y-3"
+            >
+              {recordedBlob && (
+                <Button
+                  onClick={handleSubmit}
+                  size="lg"
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      Submit Answer
+                    </>
+                  )}
+                </Button>
+              )}
+              
+              {/* Skip Button */}
+              <Button
+                onClick={onSkipQuestion}
+                variant="outline"
+                size="lg"
+                className="w-full border-orange-300 dark:border-orange-600 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20"
                 disabled={isProcessing}
               >
-                {isProcessing ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    Submit Answer
-                  </>
-                )}
+                <SkipForward className="w-5 h-5 mr-2" />
+                Skip Question
               </Button>
             </motion.div>
-          ) : null}
+          )}
 
           {/* Debug Info (only in development) */}
           {process.env.NODE_ENV === "development" && (

@@ -1,4 +1,4 @@
-import { Lightbulb, Volume2, Target, Clock, CheckCircle } from "lucide-react";
+import { Lightbulb, Volume2, Target, Clock, CheckCircle, SkipForward } from "lucide-react";
 import React, { useEffect, useState, useRef } from "react";
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,9 @@ function QuestionsSection({
   activeQuestionIndex, 
   onQuestionChange, 
   answeredQuestions, 
-  isCurrentQuestionAnswered 
+  isCurrentQuestionAnswered,
+  isCurrentQuestionSkipped,
+  skippedQuestions
 }) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState(null);
@@ -201,6 +203,7 @@ function QuestionsSection({
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {mockInterviewQuestion.map((question, index) => {
               const isAnswered = answeredQuestions.has(index);
+              const isSkipped = skippedQuestions.has(index);
               const isActive = activeQuestionIndex === index;
               
               return (
@@ -219,12 +222,16 @@ function QuestionsSection({
                         ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg"
                         : isAnswered
                         ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800"
+                        : isSkipped
+                        ? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800"
                         : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                     }`}
                   >
                     <div className="flex items-center justify-center space-x-2">
                       {isAnswered ? (
                         <CheckCircle className="w-4 h-4 text-green-500 dark:text-green-400" />
+                      ) : isSkipped ? (
+                        <SkipForward className="w-4 h-4 text-orange-500 dark:text-orange-400" />
                       ) : (
                         <span className="text-sm font-medium">
                           {index + 1}
@@ -255,6 +262,12 @@ function QuestionsSection({
                 <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 border-green-300 dark:border-green-600">
                   <CheckCircle className="w-3 h-3 mr-1" />
                   Answered
+                </Badge>
+              )}
+              {isCurrentQuestionSkipped && (
+                <Badge variant="outline" className="bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-600">
+                  <SkipForward className="w-3 h-3 mr-1" />
+                  Skipped
                 </Badge>
               )}
             </div>
@@ -288,13 +301,6 @@ function QuestionsSection({
                     <Volume2 className="w-4 h-4 mr-2" />
                     Listen
                   </Button>
-                )}
-                
-                {selectedVoice && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    <div className="font-medium">{selectedVoice.name}</div>
-                    <div className="text-xs opacity-75">Standard Quality</div>
-                  </div>
                 )}
               </div>
               

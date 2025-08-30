@@ -34,6 +34,7 @@ function StartInterview({ params }) {
   // Track answered questions
   const [answeredQuestions, setAnsweredQuestions] = useState(new Set());
   const [questionAnswers, setQuestionAnswers] = useState({});
+  const [skippedQuestions, setSkippedQuestions] = useState(new Set());
 
   // Recording state management
   const [isRecording, setIsRecording] = useState(false);
@@ -62,19 +63,34 @@ function StartInterview({ params }) {
     try {
       console.log("Answer submitted:", answerData);
       
+      // Check if this question was previously skipped
+      const wasSkipped = skippedQuestions.has(activeQuestionIndex);
+      
       // Mark current question as answered
       const newAnsweredQuestions = new Set(answeredQuestions);
       newAnsweredQuestions.add(activeQuestionIndex);
       setAnsweredQuestions(newAnsweredQuestions);
+      
+      // Remove from skipped questions if it was previously skipped
+      const newSkippedQuestions = new Set(skippedQuestions);
+      newSkippedQuestions.delete(activeQuestionIndex);
+      setSkippedQuestions(newSkippedQuestions);
       
       // Store the answer data
       setQuestionAnswers(prev => ({
         ...prev,
         [activeQuestionIndex]: {
           ...answerData,
-          submittedAt: new Date().toISOString()
+          submittedAt: new Date().toISOString(),
+          wasSkipped: wasSkipped // Track if this was converted from skipped
         }
       }));
+
+      // Show success message
+      if (wasSkipped) {
+        console.log(`Question ${activeQuestionIndex + 1} converted from skipped to answered`);
+        // You could add a toast notification here if you want
+      }
 
       // Reset recording states after successful submission
       setRecordedBlob(null);
@@ -95,25 +111,59 @@ function StartInterview({ params }) {
     }
   };
 
+  const handleSkipQuestion = () => {
+    // Mark current question as skipped
+    const newSkippedQuestions = new Set(skippedQuestions);
+    newSkippedQuestions.add(activeQuestionIndex);
+    setSkippedQuestions(newSkippedQuestions);
+    
+    // Remove from answered questions if it was previously answered
+    const newAnsweredQuestions = new Set(answeredQuestions);
+    newAnsweredQuestions.delete(activeQuestionIndex);
+    setAnsweredQuestions(newAnsweredQuestions);
+    
+    // Remove answer data if it exists
+    setQuestionAnswers(prev => {
+      const newAnswers = { ...prev };
+      delete newAnswers[activeQuestionIndex];
+      return newAnswers;
+    });
+
+    // Reset recording states
+    setRecordedBlob(null);
+    setAudioUrl(null);
+    setIsRecording(false);
+    setIsPlaying(false);
+
+    // Move to next question
+    if (activeQuestionIndex < mockInterviewQuestion?.length - 1) {
+      setActiveQuestionIndex(activeQuestionIndex + 1);
+    }
+  };
+
   const handleQuestionChange = (questionIndex) => {
-    // Only allow navigation to questions that have been answered or are the next unanswered question
-    const canNavigateTo = questionIndex <= activeQuestionIndex || answeredQuestions.has(questionIndex);
+    // Allow navigation to any question that has been answered, skipped, or is the next unanswered question
+    const canNavigateTo = questionIndex <= activeQuestionIndex || 
+                         answeredQuestions.has(questionIndex) || 
+                         skippedQuestions.has(questionIndex);
     
     if (canNavigateTo) {
       setActiveQuestionIndex(questionIndex);
     } else {
-      // Show a message that they need to answer the current question first
-      alert("Please answer the current question before moving to a later one.");
+      // Show a message that they need to answer or skip the current question first
+      alert("Please answer or skip the current question before moving to a later one.");
     }
   };
 
-  // Calculate progress based on answered questions, not current position
+  // Calculate progress based on answered questions only (not skipped)
   const progressPercentage = mockInterviewQuestion
     ? (answeredQuestions.size / mockInterviewQuestion.length) * 100
     : 0;
 
-  // Check if current question is answered
+  // Check if current question is answered or skipped
   const isCurrentQuestionAnswered = answeredQuestions.has(activeQuestionIndex);
+  const isCurrentQuestionSkipped = skippedQuestions.has(activeQuestionIndex);
+  const canProceed = isCurrentQuestionAnswered || isCurrentQuestionSkipped;
 
   // Don't render until mounted to prevent hydration mismatch
   if (!mounted) {
@@ -198,6 +248,8 @@ function StartInterview({ params }) {
               onQuestionChange={handleQuestionChange}
               answeredQuestions={answeredQuestions}
               isCurrentQuestionAnswered={isCurrentQuestionAnswered}
+              isCurrentQuestionSkipped={isCurrentQuestionSkipped}
+              skippedQuestions={skippedQuestions}
             />
           </motion.div>
 
@@ -212,6 +264,7 @@ function StartInterview({ params }) {
                 mockInterviewQuestion?.[activeQuestionIndex]?.question || ""
               }
               onAnswerSubmit={handleAnswerSubmit}
+              onSkipQuestion={handleSkipQuestion}
               isRecording={isRecording}
               setIsRecording={setIsRecording}
               recordedBlob={recordedBlob}
@@ -221,6 +274,7 @@ function StartInterview({ params }) {
               audioUrl={audioUrl}
               setAudioUrl={setAudioUrl}
               isQuestionAnswered={isCurrentQuestionAnswered}
+              isQuestionSkipped={isCurrentQuestionSkipped}
             />
           </motion.div>
         </div>
@@ -257,7 +311,7 @@ function StartInterview({ params }) {
                         setActiveQuestionIndex(activeQuestionIndex + 1)
                       }
                       className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
-                      disabled={!isCurrentQuestionAnswered}
+                      disabled={!canProceed}
                     >
                       Next Question
                       <ChevronRight className="w-4 h-4 ml-2" />
@@ -275,7 +329,7 @@ function StartInterview({ params }) {
                     >
                       <Button 
                         className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white"
-                        disabled={!isCurrentQuestionAnswered}
+                        disabled={!canProceed}
                       >
                         <Trophy className="w-4 h-4 mr-2" />
                         End Interview
@@ -286,10 +340,19 @@ function StartInterview({ params }) {
               </div>
               
               {/* Navigation Help */}
-              {!isCurrentQuestionAnswered && (
+              {!canProceed && (
                 <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                   <p className="text-sm text-yellow-800 dark:text-yellow-200 text-center">
-                    💡 Please record and submit your answer to this question before proceeding
+                    💡 Please record and submit your answer or skip the current question before proceeding
+                  </p>
+                </div>
+              )}
+              
+              {/* Help for skipped questions */}
+              {isCurrentQuestionSkipped && (
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm text-blue-800 dark:text-blue-200 text-center">
+                    🎯 This question was previously skipped. You can now record and submit an answer, or skip it again.
                   </p>
                 </div>
               )}
