@@ -1,72 +1,171 @@
 import { Lightbulb, Volume2, Target, Clock, CheckCircle } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 function QuestionsSection({ mockInterviewQuestion, activeQuestionIndex, onQuestionChange }) {
-  const [voices, setVoices] = useState([]);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState(null);
+  const speechRef = useRef(null);
+  const synthRef = useRef(null);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       const synth = window.speechSynthesis;
+      synthRef.current = synth;
 
-      const populateVoices = () => {
-        const availableVoices = synth.getVoices();
-        setVoices(availableVoices);
-        // Select a more natural-sounding voice
-        if (availableVoices.length > 0 && !selectedVoice) {
-          // Try to find a more natural voice (Google, Microsoft, or premium voices)
-          const preferredVoice = availableVoices.find(voice => 
-            voice.name.includes('Google') || 
-            voice.name.includes('Microsoft') || 
-            voice.name.includes('Premium') ||
-            voice.name.includes('Natural') ||
-            voice.name.includes('Enhanced')
-          ) || availableVoices[0];
-          setSelectedVoice(preferredVoice);
+      const initializeVoices = () => {
+        // Get all available voices
+        const voices = synth.getVoices();
+        
+        // Look specifically for English (Received Pronunciation) voice
+        let targetVoice = voices.find(voice => 
+          voice.name === 'English (Received Pronunciation)' ||
+          voice.name === 'en-GB-Standard-A' ||
+          voice.name === 'en-GB-Standard-B' ||
+          voice.name === 'en-GB-Standard-C' ||
+          voice.name === 'en-GB-Standard-D'
+        );
+
+        // If not found, look for any British English voice
+        if (!targetVoice) {
+          targetVoice = voices.find(voice => 
+            voice.lang === 'en-GB' && 
+            !voice.name.includes('Test') &&
+            !voice.name.includes('Demo')
+          );
+        }
+
+        // Fallback to any English voice if British not available
+        if (!targetVoice) {
+          targetVoice = voices.find(voice => 
+            voice.lang.startsWith('en') && 
+            !voice.name.includes('Test') &&
+            !voice.name.includes('Demo')
+          );
+        }
+
+        if (targetVoice) {
+          setSelectedVoice(targetVoice);
+          console.log('Selected voice:', targetVoice.name, targetVoice.lang);
         }
       };
 
-      populateVoices();
-      synth.onvoiceschanged = populateVoices;
+      // Initialize voices immediately if available
+      if (synth.getVoices().length > 0) {
+        initializeVoices();
+      }
+
+      // Listen for voice changes
+      synth.onvoiceschanged = initializeVoices;
+
+      return () => {
+        if (speechRef.current) {
+          synth.cancel();
+        }
+        synth.onvoiceschanged = null;
+      };
     }
-  }, [selectedVoice]);
+  }, []);
+
+  const forceStopSpeech = () => {
+    if (synthRef.current) {
+      // Force stop all speech synthesis
+      synthRef.current.cancel();
+      synthRef.current.pause();
+      
+      // Reset the synthesis object
+      setTimeout(() => {
+        if (synthRef.current) {
+          synthRef.current.resume();
+        }
+      }, 100);
+    }
+    
+    if (speechRef.current) {
+      speechRef.current = null;
+    }
+    
+    setIsSpeaking(false);
+  };
 
   const textToSpeech = (text) => {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      // Stop any current speech
-      window.speechSynthesis.cancel();
-      
-      const speech = new SpeechSynthesisUtterance(text);
-      speech.voice = selectedVoice;
-      
-      // Improve speech quality
-      speech.rate = 0.9; // Slightly slower for clarity
-      speech.pitch = 1.0; // Natural pitch
-      speech.volume = 1.0; // Full volume
-      
-      // Add pauses for better natural flow
-      const enhancedText = text
-        .replace(/\./g, '... ') // Add pauses after sentences
-        .replace(/\!/g, '!... ') // Add pauses after exclamations
-        .replace(/\?/g, '?... '); // Add pauses after questions
-      
-      speech.text = enhancedText;
-      
-      window.speechSynthesis.speak(speech);
-    } else {
-      alert("Sorry, your browser does not support text-to-speech");
-    }
+    if (!text) return;
+
+    // Force stop any existing speech
+    forceStopSpeech();
+
+    // Wait a bit to ensure previous speech is completely stopped
+    setTimeout(() => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window && synthRef.current) {
+        try {
+          // Create new speech utterance
+          const speech = new SpeechSynthesisUtterance();
+          speechRef.current = speech;
+          
+          // Set text
+          speech.text = text;
+          
+          // Set voice if available
+          if (selectedVoice) {
+            speech.voice = selectedVoice;
+          }
+          
+          // Optimize speech settings for standard quality
+          speech.rate = 0.8;        // Slower rate for clarity
+          speech.pitch = 1.0;       // Natural pitch
+          speech.volume = 0.9;      // Good volume level
+          speech.lang = 'en-GB';    // Force British English
+          
+          // Event handlers
+          speech.onstart = () => {
+            setIsSpeaking(true);
+            console.log('Speech started with voice:', speech.voice?.name);
+          };
+          
+          speech.onend = () => {
+            setIsSpeaking(false);
+            speechRef.current = null;
+            console.log('Speech ended');
+          };
+          
+          speech.onerror = (event) => {
+            console.error('Speech error:', event.error);
+            setIsSpeaking(false);
+            speechRef.current = null;
+          };
+          
+          // Start speaking
+          synthRef.current.speak(speech);
+          
+        } catch (error) {
+          console.error('Error in textToSpeech:', error);
+          setIsSpeaking(false);
+          speechRef.current = null;
+        }
+      } else {
+        alert("Sorry, your browser does not support text-to-speech");
+      }
+    }, 150); // Wait 150ms to ensure previous speech is stopped
   };
 
   const handleQuestionClick = (questionIndex) => {
+    // Stop any current speech when changing questions
+    forceStopSpeech();
+    
     if (onQuestionChange) {
       onQuestionChange(questionIndex);
     }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      forceStopSpeech();
+    };
+  }, []);
 
   if (!mockInterviewQuestion) {
     return (
@@ -149,15 +248,36 @@ function QuestionsSection({ mockInterviewQuestion, activeQuestionIndex, onQuesti
             </p>
             
             <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-slate-700">
-              <Button
-                onClick={() => textToSpeech(mockInterviewQuestion[activeQuestionIndex]?.question)}
-                variant="outline"
-                size="sm"
-                className="border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 dark:text-white"
-              >
-                <Volume2 className="w-4 h-4 mr-2" />
-                Listen
-              </Button>
+              <div className="flex items-center space-x-3">
+                {isSpeaking ? (
+                  <Button
+                    onClick={forceStopSpeech}
+                    variant="outline"
+                    size="sm"
+                    className="border-red-300 dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900 dark:text-white"
+                  >
+                    <Volume2 className="w-4 h-4 mr-2 text-red-600" />
+                    Stop
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => textToSpeech(mockInterviewQuestion[activeQuestionIndex]?.question)}
+                    variant="outline"
+                    size="sm"
+                    className="border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 dark:text-white"
+                  >
+                    <Volume2 className="w-4 h-4 mr-2" />
+                    Listen
+                  </Button>
+                )}
+                
+                {selectedVoice && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    <div className="font-medium">{selectedVoice.name}</div>
+                    <div className="text-xs opacity-75">Standard Quality</div>
+                  </div>
+                )}
+              </div>
               
               <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
                 <Clock className="w-4 h-4" />
