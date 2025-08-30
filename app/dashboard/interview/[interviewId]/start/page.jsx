@@ -30,6 +30,10 @@ function StartInterview({ params }) {
   const [mockInterviewQuestion, setMockInterviewQuestion] = useState();
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
+  
+  // Track answered questions
+  const [answeredQuestions, setAnsweredQuestions] = useState(new Set());
+  const [questionAnswers, setQuestionAnswers] = useState({});
 
   // Recording state management
   const [isRecording, setIsRecording] = useState(false);
@@ -57,8 +61,20 @@ function StartInterview({ params }) {
   const handleAnswerSubmit = async (answerData) => {
     try {
       console.log("Answer submitted:", answerData);
-      // Here you can add logic to save the answer to database
-      // For now, we'll just log it
+      
+      // Mark current question as answered
+      const newAnsweredQuestions = new Set(answeredQuestions);
+      newAnsweredQuestions.add(activeQuestionIndex);
+      setAnsweredQuestions(newAnsweredQuestions);
+      
+      // Store the answer data
+      setQuestionAnswers(prev => ({
+        ...prev,
+        [activeQuestionIndex]: {
+          ...answerData,
+          submittedAt: new Date().toISOString()
+        }
+      }));
 
       // Reset recording states after successful submission
       setRecordedBlob(null);
@@ -80,12 +96,24 @@ function StartInterview({ params }) {
   };
 
   const handleQuestionChange = (questionIndex) => {
-    setActiveQuestionIndex(questionIndex);
+    // Only allow navigation to questions that have been answered or are the next unanswered question
+    const canNavigateTo = questionIndex <= activeQuestionIndex || answeredQuestions.has(questionIndex);
+    
+    if (canNavigateTo) {
+      setActiveQuestionIndex(questionIndex);
+    } else {
+      // Show a message that they need to answer the current question first
+      alert("Please answer the current question before moving to a later one.");
+    }
   };
 
+  // Calculate progress based on answered questions, not current position
   const progressPercentage = mockInterviewQuestion
-    ? ((activeQuestionIndex + 1) / mockInterviewQuestion.length) * 100
+    ? (answeredQuestions.size / mockInterviewQuestion.length) * 100
     : 0;
+
+  // Check if current question is answered
+  const isCurrentQuestionAnswered = answeredQuestions.has(activeQuestionIndex);
 
   // Don't render until mounted to prevent hydration mismatch
   if (!mounted) {
@@ -149,6 +177,9 @@ function StartInterview({ params }) {
                   Complete
                 </span>
               </div>
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
+                {answeredQuestions.size} of {mockInterviewQuestion?.length || 0} questions answered
+              </div>
             </CardContent>
           </Card>
         </motion.div>
@@ -165,6 +196,8 @@ function StartInterview({ params }) {
               mockInterviewQuestion={mockInterviewQuestion}
               activeQuestionIndex={activeQuestionIndex}
               onQuestionChange={handleQuestionChange}
+              answeredQuestions={answeredQuestions}
+              isCurrentQuestionAnswered={isCurrentQuestionAnswered}
             />
           </motion.div>
 
@@ -187,6 +220,7 @@ function StartInterview({ params }) {
               setIsPlaying={setIsPlaying}
               audioUrl={audioUrl}
               setAudioUrl={setAudioUrl}
+              isQuestionAnswered={isCurrentQuestionAnswered}
             />
           </motion.div>
         </div>
@@ -223,6 +257,7 @@ function StartInterview({ params }) {
                         setActiveQuestionIndex(activeQuestionIndex + 1)
                       }
                       className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                      disabled={!isCurrentQuestionAnswered}
                     >
                       Next Question
                       <ChevronRight className="w-4 h-4 ml-2" />
@@ -238,7 +273,10 @@ function StartInterview({ params }) {
                         "/feedback"
                       }
                     >
-                      <Button className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white">
+                      <Button 
+                        className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white"
+                        disabled={!isCurrentQuestionAnswered}
+                      >
                         <Trophy className="w-4 h-4 mr-2" />
                         End Interview
                       </Button>
@@ -246,6 +284,15 @@ function StartInterview({ params }) {
                   )}
                 </div>
               </div>
+              
+              {/* Navigation Help */}
+              {!isCurrentQuestionAnswered && (
+                <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200 text-center">
+                    💡 Please record and submit your answer to this question before proceeding
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

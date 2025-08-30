@@ -5,7 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
-function QuestionsSection({ mockInterviewQuestion, activeQuestionIndex, onQuestionChange }) {
+function QuestionsSection({ 
+  mockInterviewQuestion, 
+  activeQuestionIndex, 
+  onQuestionChange, 
+  answeredQuestions, 
+  isCurrentQuestionAnswered 
+}) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState(null);
   const speechRef = useRef(null);
@@ -193,37 +199,42 @@ function QuestionsSection({ mockInterviewQuestion, activeQuestionIndex, onQuesti
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {mockInterviewQuestion.map((question, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <div
-                  onClick={() => handleQuestionClick(index)}
-                  className={`p-3 rounded-xl text-center cursor-pointer transition-all duration-200 ${
-                    activeQuestionIndex === index
-                      ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg"
-                      : index < activeQuestionIndex
-                      ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                  }`}
+            {mockInterviewQuestion.map((question, index) => {
+              const isAnswered = answeredQuestions.has(index);
+              const isActive = activeQuestionIndex === index;
+              
+              return (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  <div className="flex items-center justify-center space-x-2">
-                    {index < activeQuestionIndex ? (
-                      <CheckCircle className="w-4 h-4 text-green-500 dark:text-green-400" />
-                    ) : (
-                      <span className="text-sm font-medium">
-                        {index + 1}
-                      </span>
-                    )}
+                  <div
+                    onClick={() => handleQuestionClick(index)}
+                    className={`p-3 rounded-xl text-center cursor-pointer transition-all duration-200 ${
+                      isActive
+                        ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg"
+                        : isAnswered
+                        ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800"
+                        : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    }`}
+                  >
+                    <div className="flex items-center justify-center space-x-2">
+                      {isAnswered ? (
+                        <CheckCircle className="w-4 h-4 text-green-500 dark:text-green-400" />
+                      ) : (
+                        <span className="text-sm font-medium">
+                          {index + 1}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
@@ -236,9 +247,17 @@ function QuestionsSection({ mockInterviewQuestion, activeQuestionIndex, onQuesti
               <Clock className="w-5 h-5 text-orange-600" />
               <span>Question {activeQuestionIndex + 1}</span>
             </CardTitle>
-            <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-              {activeQuestionIndex + 1} of {mockInterviewQuestion.length}
-            </Badge>
+            <div className="flex items-center space-x-2">
+              <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                {activeQuestionIndex + 1} of {mockInterviewQuestion.length}
+              </Badge>
+              {isCurrentQuestionAnswered && (
+                <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 border-green-300 dark:border-green-600">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Answered
+                </Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>

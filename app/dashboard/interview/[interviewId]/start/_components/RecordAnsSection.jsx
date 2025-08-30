@@ -29,6 +29,7 @@ const RecordAnsSection = ({
   setIsPlaying,
   audioUrl,
   setAudioUrl,
+  isQuestionAnswered,
 }) => {
   const mediaRecorderRef = useRef(null);
   const audioRef = useRef(null);
@@ -490,7 +491,21 @@ const RecordAnsSection = ({
           )}
 
           {/* Submit Button */}
-          {recordedBlob && (
+          {isQuestionAnswered ? (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="pt-4"
+            >
+              <div className="w-full p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-center">
+                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
+                <p className="text-green-800 dark:text-green-200 font-medium">Question Answered</p>
+                <p className="text-green-600 dark:text-green-400 text-sm mt-1">
+                  You can review your answer or move to the next question
+                </p>
+              </div>
+            </motion.div>
+          ) : recordedBlob ? (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -515,7 +530,7 @@ const RecordAnsSection = ({
                 )}
               </Button>
             </motion.div>
-          )}
+          ) : null}
 
           {/* Debug Info (only in development) */}
           {process.env.NODE_ENV === "development" && (
