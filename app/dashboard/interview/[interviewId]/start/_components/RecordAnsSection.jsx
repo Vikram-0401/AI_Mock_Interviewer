@@ -33,6 +33,7 @@ const RecordAnsSection = ({
   setAudioUrl,
   isQuestionAnswered,
   isQuestionSkipped,
+  currentQuestionData, // Add this prop to get the full question data
 }) => {
   const mediaRecorderRef = useRef(null);
   const audioRef = useRef(null);
@@ -278,18 +279,33 @@ const RecordAnsSection = ({
       return;
     }
 
+    console.log("Current question data:", currentQuestionData);
+    console.log("Current question:", currentQuestion);
+
     setIsProcessing(true);
     try {
       // Convert blob to base64 for submission
       const reader = new FileReader();
       reader.onload = () => {
         const base64Audio = reader.result.split(",")[1];
-        onAnswerSubmit({
+        
+        // Prepare complete answer data for AI evaluation
+        const answerData = {
           question: currentQuestion,
-          audioData: base64Audio,
+          expectedAnswer: currentQuestionData?.answer || 
+                         currentQuestionData?.expectedAnswer || 
+                         currentQuestionData?.correctAnswer ||
+                         currentQuestionData?.solution ||
+                         "Expected answer not available",
+          userAnswer: transcript || "Audio recorded (no transcript available)",
+          userAudio: base64Audio,
           transcript: transcript || "Audio recorded (no transcript available)",
           timestamp: new Date().toISOString(),
-        });
+          category: currentQuestionData?.category || "general",
+          difficulty: currentQuestionData?.difficulty || "mid",
+        };
+
+        onAnswerSubmit(answerData);
 
         // Reset states
         setRecordedBlob(null);
@@ -600,24 +616,6 @@ const RecordAnsSection = ({
                 Skip Question
               </Button>
             </motion.div>
-          )}
-
-          {/* Debug Info (only in development) */}
-          {process.env.NODE_ENV === "development" && (
-            <div className="p-3 bg-gray-100 dark:bg-slate-700 rounded-lg text-xs space-y-1 text-gray-700 dark:text-gray-300">
-              <p>Debug: Permission: {hasPermission ? "Yes" : "No"}</p>
-              <p>
-                Debug: Recorder State:{" "}
-                {mediaRecorderRef.current?.state || "Not initialized"}
-              </p>
-              <p>Debug: Is Recording: {isRecording ? "Yes" : "No"}</p>
-              <p>
-                Debug: Stream Active: {streamRef.current?.active ? "Yes" : "No"}
-              </p>
-              <p>
-                Debug: Current Question: {currentQuestion ? "Set" : "Not set"}
-              </p>
-            </div>
           )}
         </CardContent>
       </Card>

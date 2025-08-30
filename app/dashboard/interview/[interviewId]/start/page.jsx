@@ -1,6 +1,6 @@
 "use client";
 import { db } from "@/utils/db";
-import { MockInterview } from "@/utils/schema";
+import { MockInterview, UserAnswer } from "@/utils/schema";
 import { eq } from "drizzle-orm";
 import React, { useEffect, useState, use } from "react";
 import { motion } from "framer-motion";
@@ -21,10 +21,12 @@ import {
 import QuestionsSection from "./_components/QuestionsSection";
 import RecordAnsSection from "./_components/RecordAnsSection";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 
 function StartInterview({ params }) {
   // Unwrap params for Next.js 15 compatibility
   const { interviewId } = use(params);
+  const { user } = useUser();
 
   const [interviewData, setInterviewData] = useState();
   const [mockInterviewQuestion, setMockInterviewQuestion] = useState();
@@ -54,7 +56,8 @@ function StartInterview({ params }) {
       .where(eq(MockInterview.mockId, interviewId));
 
     const jsonMockResp = JSON.parse(result[0].jsonMockResp);
-    console.log(jsonMockResp);
+    console.log("Interview questions data:", jsonMockResp);
+    console.log("First question structure:", jsonMockResp[0]);
     setMockInterviewQuestion(jsonMockResp);
     setInterviewData(result[0]);
   };
@@ -63,51 +66,80 @@ function StartInterview({ params }) {
     try {
       console.log("Answer submitted:", answerData);
       
-      // Check if this question was previously skipped
-      const wasSkipped = skippedQuestions.has(activeQuestionIndex);
+      // Store the answer in the database first
+      const userEmail = user?.primaryEmailAddress?.emailAddress;
       
-      // Mark current question as answered
-      const newAnsweredQuestions = new Set(answeredQuestions);
-      newAnsweredQuestions.add(activeQuestionIndex);
-      setAnsweredQuestions(newAnsweredQuestions);
+      // Prepare the data for insertion with proper fallbacks
+      const insertData = {
+        mockIdRef: interviewId,
+        question: answerData.question || "Question not available",
+        expectedAnswer: answerData.expectedAnswer || null,
+        userAnswer: answerData.userAnswer || "No answer provided",
+        userAudio: answerData.userAudio || null,
+        transcript: answerData.transcript || null,
+        category: answerData.category || "general",
+        difficulty: answerData.difficulty || "mid",
+        userEmail: userEmail || null,
+        createdAt: new Date().toISOString(),
+      };
+
+      console.log("Inserting data:", insertData);
       
-      // Remove from skipped questions if it was previously skipped
-      const newSkippedQuestions = new Set(skippedQuestions);
-      newSkippedQuestions.delete(activeQuestionIndex);
-      setSkippedQuestions(newSkippedQuestions);
-      
-      // Store the answer data
-      setQuestionAnswers(prev => ({
-        ...prev,
-        [activeQuestionIndex]: {
-          ...answerData,
-          submittedAt: new Date().toISOString(),
-          wasSkipped: wasSkipped // Track if this was converted from skipped
+      // Insert into UserAnswer table
+      const insertResult = await db
+        .insert(UserAnswer)
+        .values(insertData)
+        .returning({ id: UserAnswer.id });
+
+      if (insertResult && insertResult[0]?.id) {
+        console.log("Answer stored in database with ID:", insertResult[0].id);
+        
+        // Mark current question as answered
+        const newAnsweredQuestions = new Set(answeredQuestions);
+        newAnsweredQuestions.add(activeQuestionIndex);
+        setAnsweredQuestions(newAnsweredQuestions);
+        
+        // Remove from skipped questions if it was previously skipped
+        const newSkippedQuestions = new Set(skippedQuestions);
+        newSkippedQuestions.delete(activeQuestionIndex);
+        setSkippedQuestions(newSkippedQuestions);
+        
+        // Store the answer data in local state
+        setQuestionAnswers(prev => ({
+          ...prev,
+          [activeQuestionIndex]: {
+            ...answerData,
+            dbId: insertResult[0].id,
+            submittedAt: new Date().toISOString(),
+            wasSkipped: skippedQuestions.has(activeQuestionIndex)
+          }
+        }));
+
+        // Show success message
+        if (skippedQuestions.has(activeQuestionIndex)) {
+          console.log(`Question ${activeQuestionIndex + 1} converted from skipped to answered`);
         }
-      }));
 
-      // Show success message
-      if (wasSkipped) {
-        console.log(`Question ${activeQuestionIndex + 1} converted from skipped to answered`);
-        // You could add a toast notification here if you want
-      }
+        // Reset recording states after successful submission
+        setRecordedBlob(null);
+        setAudioUrl(null);
+        setIsRecording(false);
+        setIsPlaying(false);
 
-      // Reset recording states after successful submission
-      setRecordedBlob(null);
-      setAudioUrl(null);
-      setIsRecording(false);
-      setIsPlaying(false);
-
-      // Move to next question
-      if (activeQuestionIndex < mockInterviewQuestion?.length - 1) {
-        setActiveQuestionIndex(activeQuestionIndex + 1);
-        // Small delay to ensure state is properly reset
-        setTimeout(() => {
-          console.log("Moved to next question, recording states reset");
-        }, 100);
+        // Move to next question
+        if (activeQuestionIndex < mockInterviewQuestion?.length - 1) {
+          setActiveQuestionIndex(activeQuestionIndex + 1);
+          // Small delay to ensure state is properly reset
+          setTimeout(() => {
+            console.log("Moved to next question, recording states reset");
+          }, 100);
+        }
+      } else {
+        throw new Error("Failed to store answer in database");
       }
     } catch (error) {
       console.error("Error handling answer submission:", error);
+      alert("Failed to submit answer. Please try again. Error: " + error.message);
     }
   };
 
@@ -263,6 +295,7 @@ function StartInterview({ params }) {
               currentQuestion={
                 mockInterviewQuestion?.[activeQuestionIndex]?.question || ""
               }
+              currentQuestionData={mockInterviewQuestion?.[activeQuestionIndex] || {}}
               onAnswerSubmit={handleAnswerSubmit}
               onSkipQuestion={handleSkipQuestion}
               isRecording={isRecording}

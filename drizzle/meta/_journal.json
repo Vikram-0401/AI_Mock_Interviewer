@@ -1,12 +1,19 @@
 {
-  "version": "7",
+  "version": "5",
   "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "7",
-      "when": 1729893427976,
+      "version": "5",
+      "when": 1733123456789,
       "tag": "0000_breezy_queen_noir",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1733123456790,
+      "tag": "0001_update_user_answer_schema",
       "breakpoints": true
     }
   ]
